@@ -1,44 +1,71 @@
 import asyncio
 import logging
-from fastapi import FastAPI, WebSocket
-from fastapi.staticfiles import StaticFiles
+import secrets
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Header, HTTPException, status
 from fastapi.responses import HTMLResponse
-from typing import List, Dict
-import json
+from pydantic import BaseModel
+from typing import List, Optional
+
+from backend.config import DASHBOARD_HOST, DASHBOARD_PORT, DASHBOARD_TOKEN
 
 logger = logging.getLogger(__name__)
 
+
+class CommandRequest(BaseModel):
+    """Body model for the command endpoint (validates/limits user input)."""
+    command: str
+
+
 class WebDashboard:
     """Web-based dashboard for SAM monitoring and control"""
-    
-    def __init__(self, host: str = "127.0.0.1", port: int = 8000):
+
+    def __init__(self, host: str = None, port: int = None, token: str = None):
         logger.info("🌐 Initializing Web Dashboard...")
-        
-        self.host = host
-        self.port = port
+
+        self.host = host or DASHBOARD_HOST
+        self.port = port or DASHBOARD_PORT
+
+        # Require a token for all API/WebSocket access. Generate one if not
+        # configured so the dashboard is never left completely unauthenticated.
+        self.token = token or DASHBOARD_TOKEN or secrets.token_urlsafe(32)
+        if not (token or DASHBOARD_TOKEN):
+            logger.warning(
+                "No DASHBOARD_TOKEN configured; generated a temporary one for "
+                "this session: %s", self.token
+            )
+
         self.app = FastAPI(title="SAM Dashboard")
         self.active_connections: List[WebSocket] = []
-        
+
         self._setup_routes()
         logger.info("✅ Web Dashboard initialized")
-    
+
+    def _require_token(self, x_api_key: Optional[str] = Header(default=None)):
+        """Dependency enforcing a valid API key on protected endpoints."""
+        if not x_api_key or not secrets.compare_digest(x_api_key, self.token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or missing API key",
+            )
+
     def _setup_routes(self):
         """Setup FastAPI routes"""
-        
+
         @self.app.get("/")
         async def get_dashboard():
             """Serve dashboard HTML"""
             return HTMLResponse(self._get_dashboard_html())
-        
-        @self.app.get("/api/status")
+
+        @self.app.get("/api/status", dependencies=[Depends(self._require_token)])
         async def get_status():
             """Get SAM status"""
+            from datetime import datetime
             return {
                 'status': 'active',
-                'timestamp': str(__import__('datetime').datetime.now())
+                'timestamp': datetime.now().isoformat()
             }
-        
-        @self.app.get("/api/stats")
+
+        @self.app.get("/api/stats", dependencies=[Depends(self._require_token)])
         async def get_stats():
             """Get system statistics"""
             return {
@@ -47,35 +74,45 @@ class WebDashboard:
                 'mood': 'happy',
                 'api_calls': {'gemini': 45, 'groq': 35}
             }
-        
+
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
-            """WebSocket for real-time updates"""
+            """WebSocket for real-time updates (token required)"""
+            token = websocket.query_params.get("token", "")
+            if not secrets.compare_digest(token, self.token):
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+
             await websocket.accept()
             self.active_connections.append(websocket)
             try:
                 while True:
                     data = await websocket.receive_text()
                     await self.broadcast(f"Message: {data}")
-            except:
-                self.active_connections.remove(websocket)
-        
-        @self.app.post("/api/command")
-        async def execute_command(command: str):
+            except WebSocketDisconnect:
+                pass
+            finally:
+                if websocket in self.active_connections:
+                    self.active_connections.remove(websocket)
+
+        @self.app.post("/api/command", dependencies=[Depends(self._require_token)])
+        async def execute_command(request: CommandRequest):
             """Execute a command"""
-            logger.info(f"💻 Executing command: {command}")
-            return {'success': True, 'result': f'Command executed: {command}'}
-    
+            logger.info("💻 Received command request")
+            return {'success': True, 'result': f'Command received: {request.command}'}
+
     async def broadcast(self, message: str):
         """Broadcast message to all connected clients"""
-        for connection in self.active_connections:
+        for connection in list(self.active_connections):
             try:
                 await connection.send_text(message)
-            except:
-                pass
-    
+            except Exception:
+                if connection in self.active_connections:
+                    self.active_connections.remove(connection)
+
     def _get_dashboard_html(self) -> str:
         """Get dashboard HTML"""
+        # The token is injected so the local operator's browser can authenticate.
         return """
         <!DOCTYPE html>
         <html lang="en">
@@ -136,31 +173,42 @@ class WebDashboard:
             </div>
 
             <script>
+                const API_TOKEN = "__DASHBOARD_TOKEN__";
+
                 // Connect to WebSocket
-                const ws = new WebSocket('ws://localhost:8000/ws');
-                
+                const ws = new WebSocket(`ws://${location.host}/ws?token=${encodeURIComponent(API_TOKEN)}`);
+
                 ws.onmessage = (event) => {
                     const logArea = document.getElementById('log_area');
-                    logArea.innerHTML += event.data + '<br>';
+                    // Use textContent to avoid HTML/script injection (XSS).
+                    const line = document.createElement('div');
+                    line.textContent = event.data;
+                    logArea.appendChild(line);
                     logArea.scrollTop = logArea.scrollHeight;
                 };
 
                 async function sendCommand() {
                     const input = document.getElementById('command_input');
                     const command = input.value;
-                    
-                    const response = await fetch('/api/command', {
+
+                    await fetch('/api/command', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': API_TOKEN
+                        },
                         body: JSON.stringify({command})
                     });
-                    
+
                     input.value = '';
                 }
 
                 // Update stats
                 async function updateStats() {
-                    const response = await fetch('/api/stats');
+                    const response = await fetch('/api/stats', {
+                        headers: {'X-API-Key': API_TOKEN}
+                    });
+                    if (!response.ok) return;
                     const data = await response.json();
                     document.getElementById('interactions').textContent = data.interactions;
                     document.getElementById('mood').textContent = data.mood;
@@ -170,8 +218,8 @@ class WebDashboard:
             </script>
         </body>
         </html>
-        """
-    
+        """.replace("__DASHBOARD_TOKEN__", self.token)
+
     async def run(self):
         """Run the dashboard server"""
         import uvicorn
@@ -182,6 +230,7 @@ class WebDashboard:
             host=self.host,
             port=self.port
         )
+
 
 if __name__ == "__main__":
     dashboard = WebDashboard()
