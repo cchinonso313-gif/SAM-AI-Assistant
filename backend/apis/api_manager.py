@@ -64,6 +64,9 @@ class APIManager:
                     self.model_stats[model]['calls'] += 1
                     logger.info(f"✅ Response generated via {model}")
                     return response
+
+                logger.warning(f"⚠️ {model.upper()} returned an empty response")
+                self.model_stats[model]['errors'] += 1
             
             except Exception as e:
                 logger.warning(f"⚠️ {model.upper()} failed: {e}")

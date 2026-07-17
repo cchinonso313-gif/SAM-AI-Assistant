@@ -46,8 +46,8 @@ class SystemMonitor:
             temps = psutil.sensors_temperatures()
             if temps:
                 return list(temps.values())[0][0].current
-        except:
-            pass
+        except (AttributeError, KeyError, IndexError, OSError) as e:
+            logger.debug(f"Temperature sensors unavailable: {e}")
         return 0.0
     
     async def monitor_continuously(self, interval: int = 5):
