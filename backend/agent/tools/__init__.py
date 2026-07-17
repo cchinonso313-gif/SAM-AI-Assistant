@@ -7,14 +7,26 @@ them all together.
 
 from backend.agent.tool_registry import ToolRegistry
 from backend.agent.tools import (
+    clipboard_tools,
+    code_tools,
     file_tools,
+    gui_tools,
     project_tools,
     shell_tools,
     system_tools,
     web_tools,
 )
 
-_MODULES = [file_tools, project_tools, shell_tools, system_tools, web_tools]
+_MODULES = [
+    file_tools,
+    project_tools,
+    shell_tools,
+    system_tools,
+    web_tools,
+    gui_tools,
+    clipboard_tools,
+    code_tools,
+]
 
 
 def build_default_registry() -> ToolRegistry:

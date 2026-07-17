@@ -7,10 +7,11 @@ from backend.apis.api_manager import APIManager
 from backend.core.voice_processor import VoiceProcessor
 from backend.core.task_executor import TaskExecutor
 from backend.core.memory_manager import MemoryManager
+from backend.core.semantic_memory import SemanticMemory
 from backend.brains import BrainRouter, GeminiBrain, GroqBrain
 from backend.agent import Agent
 from backend.agent.tools import build_default_registry
-from backend.config import SAM_NAME, DEBUG_MODE, LOG_LEVEL, WAKE_WORD, AGENT_MAX_STEPS
+from backend.config import SAM_NAME, DEBUG_MODE, LOG_LEVEL, WAKE_WORD, AGENT_MAX_STEPS, DATA_DIR
 
 # Configure logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -27,6 +28,9 @@ class SAMEngine:
         self.voice_processor = VoiceProcessor()
         self.task_executor = TaskExecutor()
         self.memory_manager = MemoryManager()
+
+        # Semantic long-term memory for cross-session vector recall.
+        self.semantic_memory = SemanticMemory(path=DATA_DIR / "semantic_memory.json")
 
         # Multi-brain router (reuses the API manager's handlers) so more
         # providers can be registered later without touching the engine.
@@ -108,6 +112,12 @@ class SAMEngine:
             
             # Get relevant context from memory
             context = await self.memory_manager.get_context()
+
+            # Enrich with semantically-recalled long-term memories.
+            recalled = self.semantic_memory.search(user_input, top_k=3)
+            if recalled and isinstance(context, dict):
+                context = dict(context)
+                context["recalled_memories"] = [r["text"] for r in recalled]
             
             # Check if task requires execution
             if self._is_task_command(user_input):
@@ -123,6 +133,12 @@ class SAMEngine:
                     model_preference=self._select_model(user_input)
                 )
             
+            # Persist the exchange to semantic long-term memory.
+            self.semantic_memory.add(
+                f"User: {user_input}\n{self.name}: {response}",
+                metadata={"is_voice": is_voice},
+            )
+
             # Update mood based on interaction
             self.mood = await self._analyze_mood(user_input, response)
             

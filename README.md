@@ -5,7 +5,10 @@
 ## Features
 
 ✅ **Autonomous Agent** - Plan → act → observe → reflect loop over a modular tool registry  
-✅ **Modular Tools** - File ops, project/website scaffolding, safe shell, web fetch, system info  
+✅ **Modular Tools** - File ops, project/website scaffolding, safe shell, web fetch + web search, system info  
+✅ **Desktop Automation** - Mouse, keyboard, screenshots, window focus, clipboard  
+✅ **Sandboxed Code Execution** - Run generated Python in an isolated subprocess  
+✅ **Semantic Long-Term Memory** - Vector recall of relevant facts across sessions  
 ✅ **Multi-Brain Routing** - Pluggable LLM "brains" (Gemini, Groq, and more) with automatic failover  
 ✅ **Glowing Desktop Indicator** - Smooth pulsing, always-on-top status light (top-center) that changes color by state (idle/active/listening/thinking/speaking)  
 ✅ **Voice Recognition & Response** - Real-time voice input/output  
@@ -21,10 +24,10 @@
 ```
 backend/
   agent/        # autonomous agent loop, tool registry, safety
-    tools/      # one module per capability (file, project, shell, web, system)
+    tools/      # one module per capability (file, project, shell, web, gui, clipboard, code, system)
   brains/       # pluggable LLM backends + failover router
   apis/         # provider SDK handlers (Gemini, Groq)
-  core/         # engine, memory, voice, task executor
+  core/         # engine, memory, semantic memory, voice, task executor
   features/     # web dashboard, scheduler
 desktop/        # glowing status indicator, system monitor
 ```

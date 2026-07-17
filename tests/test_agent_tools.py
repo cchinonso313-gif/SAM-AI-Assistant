@@ -122,6 +122,22 @@ class TestWebTools:
         assert result.success
         assert "hello world" in result.output
 
+    def test_web_search_mocked(self):
+        html_body = (
+            '<a class="result__a" href="/l/?uddg=https%3A%2F%2Fexample.com%2Fa">'
+            "First Result</a>"
+            '<a class="result__a" href="/l/?uddg=https%3A%2F%2Fexample.com%2Fb">'
+            "Second Result</a>"
+        )
+        fake_resp = MagicMock()
+        fake_resp.text = html_body
+        with patch("requests.post", return_value=fake_resp):
+            result = web_tools.web_search("example", max_results=1)
+        assert result.success
+        assert "First Result" in result.output
+        assert "https://example.com/a" in result.output
+        assert "Second Result" not in result.output
+
 
 class TestDefaultRegistry:
     def test_all_tools_registered(self):
@@ -136,6 +152,12 @@ class TestDefaultRegistry:
             "run_shell",
             "system_info",
             "web_fetch",
+            "web_search",
+            "run_python",
+            "screenshot",
+            "move_mouse",
+            "type_text",
+            "copy_to_clipboard",
         ]:
             assert name in reg
 
