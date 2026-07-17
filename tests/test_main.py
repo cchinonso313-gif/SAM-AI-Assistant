@@ -14,7 +14,10 @@ def mock_engine():
     engine.process = AsyncMock(return_value="response")
     engine.listen = AsyncMock()
     engine.activate = MagicMock()
-    with patch.object(main_module, "SAMEngine", return_value=engine):
+    # Disable the optional Qt desktop indicator during tests.
+    with patch.object(main_module, "SAMEngine", return_value=engine), patch.object(
+        main_module, "INDICATOR_ENABLED", False
+    ):
         yield engine
 
 

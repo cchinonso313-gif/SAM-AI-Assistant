@@ -7,7 +7,10 @@ from backend.apis.api_manager import APIManager
 from backend.core.voice_processor import VoiceProcessor
 from backend.core.task_executor import TaskExecutor
 from backend.core.memory_manager import MemoryManager
-from backend.config import SAM_NAME, DEBUG_MODE, LOG_LEVEL, WAKE_WORD
+from backend.brains import BrainRouter, GeminiBrain, GroqBrain
+from backend.agent import Agent
+from backend.agent.tools import build_default_registry
+from backend.config import SAM_NAME, DEBUG_MODE, LOG_LEVEL, WAKE_WORD, AGENT_MAX_STEPS
 
 # Configure logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -24,16 +27,53 @@ class SAMEngine:
         self.voice_processor = VoiceProcessor()
         self.task_executor = TaskExecutor()
         self.memory_manager = MemoryManager()
+
+        # Multi-brain router (reuses the API manager's handlers) so more
+        # providers can be registered later without touching the engine.
+        self.brain_router = BrainRouter()
+        self.brain_router.register(GeminiBrain(handler=self.api_manager.gemini))
+        self.brain_router.register(GroqBrain(handler=self.api_manager.groq))
+
+        # Autonomous agent with a modular tool registry.
+        self.tool_registry = build_default_registry()
+        self.agent = Agent(
+            router=self.brain_router,
+            registry=self.tool_registry,
+            name=SAM_NAME,
+            max_steps=AGENT_MAX_STEPS,
+        )
+
+        # Optional visual indicator; wired by the app layer to avoid Qt in
+        # headless contexts.
+        self.indicator = None
+
         self.is_active = False
         self.is_listening = False
         self.mood = "neutral"
         
         logger.info(f"✅ {SAM_NAME} Engine initialized successfully")
+
+    def _set_indicator(self, state: str):
+        """Update the desktop indicator state if one is attached."""
+        if self.indicator is not None:
+            try:
+                self.indicator.set_state(state)
+            except Exception as e:  # noqa: BLE001 - UI must never break logic
+                logger.debug(f"Indicator update failed: {e}")
+
+    async def run_task(self, goal: str, context: Optional[str] = None):
+        """Run an autonomous multi-step task via the agent loop."""
+        self._set_indicator("thinking")
+        try:
+            return await self.agent.run(goal, context=context)
+        finally:
+            self._set_indicator("active" if self.is_active else "idle")
     
     async def initialize(self):
         """Initialize all components asynchronously"""
         logger.info("Initializing SAM components...")
         await self.api_manager.initialize()
+        await self.brain_router.initialize()
         await self.memory_manager.load_history()
         logger.info("✅ All components initialized")
     
@@ -57,6 +97,7 @@ class SAMEngine:
     async def process(self, user_input: str, is_voice: bool = False) -> str:
         """Process user input and generate response"""
         logger.info(f"🔄 Processing: {user_input[:100]}...")
+        self._set_indicator("thinking")
         
         try:
             # Store in memory
@@ -95,6 +136,7 @@ class SAMEngine:
             
             # Output response
             if is_voice:
+                self._set_indicator("speaking")
                 await self.voice_processor.text_to_speech(response)
             
             logger.info(f"✅ Response generated (Mood: {self.mood})")
@@ -106,6 +148,8 @@ class SAMEngine:
             if is_voice:
                 await self.voice_processor.text_to_speech(error_response)
             return error_response
+        finally:
+            self._set_indicator("active" if self.is_active else "idle")
     
     def _is_task_command(self, user_input: str) -> bool:
         """Determine if input requires task execution"""
@@ -150,12 +194,14 @@ class SAMEngine:
         """Activate SAM"""
         logger.info(f"🟢 Activating {self.name}")
         self.is_active = True
+        self._set_indicator("active")
     
     def deactivate(self):
         """Deactivate SAM"""
-        logger.info(f"�� Deactivating {self.name}")
+        logger.info(f"🔴 Deactivating {self.name}")
         self.is_active = False
         self.stop_listening()
+        self._set_indicator("idle")
     
     async def shutdown(self):
         """Graceful shutdown"""

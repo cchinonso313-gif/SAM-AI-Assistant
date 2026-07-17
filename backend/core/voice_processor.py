@@ -14,16 +14,46 @@ class VoiceProcessor:
         logger.info("🎤 Initializing Voice Processor...")
         
         self.recognizer = sr.Recognizer()
-        self.engine = pyttsx3.init(TTS_ENGINE)
-        
-        # Configure TTS
-        self.engine.setProperty('rate', VOICE_RATE)
-        self.engine.setProperty('volume', VOICE_VOLUME)
-        
-        # Get available microphones
-        self.mic = sr.Microphone(device_index=MIC_INDEX)
+
+        # Initialize the TTS engine defensively. An unavailable or misconfigured
+        # driver must not crash the whole assistant.
+        self.engine = self._init_tts_engine()
+        if self.engine is not None:
+            self.engine.setProperty('rate', VOICE_RATE)
+            self.engine.setProperty('volume', VOICE_VOLUME)
+
+        # Microphone access can also fail on headless machines.
+        try:
+            self.mic = sr.Microphone(device_index=MIC_INDEX)
+        except Exception as e:  # noqa: BLE001 - degrade gracefully
+            logger.warning(f"⚠️ Microphone unavailable: {e}")
+            self.mic = None
         
         logger.info("✅ Voice Processor initialized")
+
+    @staticmethod
+    def _init_tts_engine():
+        """Create a pyttsx3 engine, falling back to the default driver."""
+        driver = TTS_ENGINE or None
+        try:
+            return pyttsx3.init(driver)
+        except Exception as e:  # noqa: BLE001 - retry with platform default
+            logger.warning(f"⚠️ TTS driver '{driver}' failed ({e}); using default")
+            try:
+                return pyttsx3.init()
+            except Exception as e2:  # noqa: BLE001 - voice output disabled
+                logger.error(f"❌ TTS engine unavailable: {e2}")
+                return None
+
+    def set_voice_properties(self, rate: int = None, volume: float = None):
+        """Update TTS rate and/or volume at runtime."""
+        if self.engine is None:
+            logger.warning("TTS engine unavailable; cannot set properties")
+            return
+        if rate is not None:
+            self.engine.setProperty('rate', rate)
+        if volume is not None:
+            self.engine.setProperty('volume', volume)
     
     async def speech_to_text(self, timeout: int = 10, phrase_time_limit: int = 15) -> Optional[str]:
         """Convert speech to text asynchronously"""

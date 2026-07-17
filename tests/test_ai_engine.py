@@ -2,6 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from backend.core.ai_engine import SAMEngine
+from backend.config import SAM_NAME
 
 class TestSAMEngine:
     """Test suite for SAM AI Engine"""
@@ -14,7 +15,7 @@ class TestSAMEngine:
     @pytest.mark.asyncio
     async def test_engine_initialization(self, engine):
         """Test engine initializes correctly"""
-        assert engine.name == "SAM"
+        assert engine.name == SAM_NAME
         assert engine.is_active == False
         assert engine.is_listening == False
         assert engine.mood == "neutral"

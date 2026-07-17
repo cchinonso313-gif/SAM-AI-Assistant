@@ -7,14 +7,14 @@ class TestVoiceProcessor:
     
     @pytest.fixture
     def processor(self):
-        """Create voice processor instance"""
-        return VoiceProcessor()
+        """Create voice processor instance with a mocked TTS backend."""
+        with patch("backend.core.voice_processor.pyttsx3.init", return_value=Mock()):
+            return VoiceProcessor()
     
     def test_voice_processor_initialization(self, processor):
         """Test voice processor initializes"""
         assert processor.recognizer is not None
         assert processor.engine is not None
-        assert processor.mic is not None
     
     @pytest.mark.asyncio
     async def test_speech_to_text_disabled(self, processor):

@@ -38,7 +38,9 @@ GROQ_CONFIG = {
 }
 
 # System Settings
-SAM_NAME = os.getenv('SAM_NAME', 'SAM')
+# Assistant display name. Historically "SAM"; now defaults to "NOVA".
+SAM_NAME = os.getenv('SAM_NAME', os.getenv('NOVA_NAME', 'NOVA'))
+ASSISTANT_NAME = SAM_NAME
 DEFAULT_MODEL = os.getenv('DEFAULT_MODEL', 'gemini')
 FALLBACK_MODEL = os.getenv('FALLBACK_MODEL', 'groq')
 DEBUG_MODE = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
@@ -47,7 +49,8 @@ LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 # Voice Configuration
 VOICE_ENABLED = os.getenv('VOICE_ENABLED', 'True').lower() == 'true'
 MIC_INDEX = int(os.getenv('MIC_INDEX', 0))
-TTS_ENGINE = os.getenv('TTS_ENGINE', 'pyttsx3')
+# Empty means let pyttsx3 select the platform default driver.
+TTS_ENGINE = os.getenv('TTS_ENGINE', '')
 VOICE_RATE = int(os.getenv('VOICE_RATE', 150))
 VOICE_VOLUME = float(os.getenv('VOICE_VOLUME', 0.9))
 WAKE_WORD = f'hey {SAM_NAME.lower()}'
@@ -57,6 +60,14 @@ INDICATOR_ENABLED = os.getenv('INDICATOR_ENABLED', 'True').lower() == 'true'
 INDICATOR_SIZE = int(os.getenv('INDICATOR_SIZE', 50))
 INDICATOR_COLOR = os.getenv('INDICATOR_COLOR', '#00FF00')
 INDICATOR_BLINK_RATE = 500  # milliseconds
+# Per-state colors for the glowing desktop indicator.
+INDICATOR_STATE_COLORS = {
+    'idle': '#3A3A3A',
+    'active': INDICATOR_COLOR,
+    'listening': '#00BFFF',
+    'thinking': '#FFB300',
+    'speaking': '#B14BFF',
+}
 
 # Security
 ENCRYPTION_ENABLED = os.getenv('ENCRYPTION_ENABLED', 'True').lower() == 'true'
@@ -85,6 +96,10 @@ BLOCKED_KEYWORDS = [
     'virus',
     'ransomware'
 ]
+
+# Autonomous Agent
+AGENT_MAX_STEPS = int(os.getenv('AGENT_MAX_STEPS', 8))
+AGENT_ENABLED = os.getenv('AGENT_ENABLED', 'True').lower() == 'true'
 
 # Logging Configuration
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
