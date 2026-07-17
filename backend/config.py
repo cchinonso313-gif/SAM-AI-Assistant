@@ -63,6 +63,13 @@ ENCRYPTION_ENABLED = os.getenv('ENCRYPTION_ENABLED', 'True').lower() == 'true'
 MAX_HISTORY_DAYS = int(os.getenv('MAX_HISTORY_DAYS', 30))
 AUTO_CLEAR_CACHE = os.getenv('AUTO_CLEAR_CACHE', 'True').lower() == 'true'
 
+# Web Dashboard
+DASHBOARD_HOST = os.getenv('DASHBOARD_HOST', '127.0.0.1')
+DASHBOARD_PORT = int(os.getenv('DASHBOARD_PORT', 8000))
+# Token required to access the dashboard API/WebSocket. If unset, a random
+# token is generated at runtime so the dashboard is never left unauthenticated.
+DASHBOARD_TOKEN = os.getenv('DASHBOARD_TOKEN')
+
 # Task Execution
 ALLOWED_COMMANDS = [
     'code',
