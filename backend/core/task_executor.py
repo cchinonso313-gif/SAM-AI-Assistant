@@ -4,6 +4,7 @@ import subprocess
 import os
 from typing import Dict, Any, Optional
 from backend.config import ALLOWED_COMMANDS, BLOCKED_KEYWORDS
+from backend.utils import contains_any
 
 logger = logging.getLogger(__name__)
 
@@ -45,17 +46,15 @@ class TaskExecutor:
     def _is_safe(self, command: str) -> bool:
         """Check if command is safe to execute"""
         # Check for blocked keywords
-        for keyword in self.blocked_keywords:
-            if keyword.lower() in command.lower():
-                logger.warning(f"Blocked keyword detected: {keyword}")
-                return False
+        if contains_any(command, self.blocked_keywords):
+            logger.warning("Blocked keyword detected")
+            return False
         
         # Check for dangerous patterns
         dangerous_patterns = ['rm -rf', 'dd if=', 'format', 'fdisk']
-        for pattern in dangerous_patterns:
-            if pattern.lower() in command.lower():
-                logger.warning(f"Dangerous pattern detected: {pattern}")
-                return False
+        if contains_any(command, dangerous_patterns):
+            logger.warning("Dangerous pattern detected")
+            return False
         
         return True
     

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 from backend.config import DATA_DIR, MAX_HISTORY_DAYS, ENCRYPTION_ENABLED
+from backend.utils import generate_id
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class MemoryManager:
         try:
             # Generate ID if not provided
             if not interaction_id:
-                interaction_id = f"int_{datetime.now().timestamp()}"
+                interaction_id = generate_id("int")
             
             interaction = {
                 'id': interaction_id,

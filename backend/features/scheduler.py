@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Callable, Optional
 from enum import Enum
 
+from backend.utils import generate_id
+
 logger = logging.getLogger(__name__)
 
 class ScheduleFrequency(Enum):
@@ -78,7 +80,7 @@ class TaskScheduler:
         arguments: Dict = None
     ) -> str:
         """Add a new scheduled task"""
-        task_id = f"task_{datetime.now().timestamp()}"
+        task_id = generate_id("task")
         task = Task(
             task_id=task_id,
             name=name,

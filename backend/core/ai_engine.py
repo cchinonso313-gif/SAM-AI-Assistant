@@ -8,6 +8,7 @@ from backend.core.voice_processor import VoiceProcessor
 from backend.core.task_executor import TaskExecutor
 from backend.core.memory_manager import MemoryManager
 from backend.config import SAM_NAME, DEBUG_MODE, LOG_LEVEL, WAKE_WORD
+from backend.utils import contains_any
 
 # Configure logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -114,12 +115,12 @@ class SAMEngine:
             'run', 'file', 'open', 'search', 'download',
             'convert', 'analyze', 'process', 'calculate'
         ]
-        return any(keyword in user_input.lower() for keyword in task_keywords)
+        return contains_any(user_input, task_keywords)
     
     def _select_model(self, user_input: str) -> str:
         """Select optimal model based on input type"""
         code_keywords = ['code', 'function', 'script', 'program', 'write']
-        if any(keyword in user_input.lower() for keyword in code_keywords):
+        if contains_any(user_input, code_keywords):
             return 'gemini'  # Gemini better for code
         return 'groq'  # Groq better for general tasks
     
@@ -133,10 +134,10 @@ class SAMEngine:
             'neutral': []
         }
         
-        combined_text = (user_input + ' ' + response).lower()
+        combined_text = user_input + ' ' + response
         
         for mood, keywords in mood_keywords.items():
-            if any(keyword in combined_text for keyword in keywords):
+            if contains_any(combined_text, keywords):
                 return mood
         
         return 'neutral'

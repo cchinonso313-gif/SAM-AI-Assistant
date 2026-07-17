@@ -1,9 +1,9 @@
-import asyncio
 import logging
 import speech_recognition as sr
 import pyttsx3
 from typing import Optional
 from backend.config import VOICE_ENABLED, MIC_INDEX, VOICE_RATE, VOICE_VOLUME, TTS_ENGINE
+from backend.utils import run_blocking
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,6 @@ class VoiceProcessor:
         try:
             logger.info("👂 Listening for speech...")
             
-            loop = asyncio.get_event_loop()
-            
             # Run in executor to avoid blocking
             def _listen():
                 with self.mic as source:
@@ -59,7 +57,7 @@ class VoiceProcessor:
                     logger.error(f"Speech recognition error: {e}")
                     return None
             
-            text = await loop.run_in_executor(None, _listen)
+            text = await run_blocking(_listen)
             return text
             
         except Exception as e:
@@ -75,14 +73,12 @@ class VoiceProcessor:
         try:
             logger.info(f"🔊 Speaking: {text[:50]}...")
             
-            loop = asyncio.get_event_loop()
-            
             def _speak():
                 self.engine.say(text)
                 self.engine.runAndWait()
             
             # Run in executor to avoid blocking
-            await loop.run_in_executor(None, _speak)
+            await run_blocking(_speak)
             
             logger.info("✅ Speech complete")
             return True
