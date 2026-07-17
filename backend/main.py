@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from backend.core.ai_engine import SAMEngine
-from backend.config import LOG_LEVEL, SAM_NAME, LOG_FILE
+from backend.config import LOG_LEVEL, SAM_NAME, LOG_FILE, INDICATOR_ENABLED
 
 # Configure logging
 logging.basicConfig(
@@ -33,7 +33,30 @@ class SAMApplication:
     def __init__(self):
         logger.info(f"🚀 Starting {SAM_NAME} Application...")
         self.engine = SAMEngine()
+        self.indicator = None
         self.is_running = False
+
+    def _setup_indicator(self):
+        """Attach the glowing desktop indicator if enabled and available."""
+        if not INDICATOR_ENABLED:
+            return
+        try:
+            from desktop.ui_indicator import DesktopIndicator
+
+            self.indicator = DesktopIndicator()
+            self.engine.indicator = self.indicator
+            self.indicator.show()
+            self.indicator.set_state("active")
+        except Exception as e:  # noqa: BLE001 - UI is optional
+            logger.warning(f"⚠️ Desktop indicator unavailable: {e}")
+
+    async def _pump_indicator(self):
+        """Keep the Qt indicator animating alongside the asyncio loop."""
+        if self.indicator is None:
+            return
+        while self.is_running:
+            self.indicator.process_events()
+            await asyncio.sleep(0.05)
     
     async def start(self):
         """Start SAM application"""
@@ -42,6 +65,9 @@ class SAMApplication:
         try:
             # Initialize components
             await self.engine.initialize()
+
+            # Set up the visual indicator
+            self._setup_indicator()
             
             # Activate engine
             self.engine.activate()
@@ -64,6 +90,7 @@ class SAMApplication:
         
         # Start voice listener in background
         voice_task = asyncio.create_task(self.engine.listen())
+        pump_task = asyncio.create_task(self._pump_indicator())
         
         try:
             while self.is_running:
@@ -94,6 +121,7 @@ class SAMApplication:
         finally:
             self.is_running = False
             voice_task.cancel()
+            pump_task.cancel()
     
     async def shutdown(self):
         """Shutdown SAM application"""

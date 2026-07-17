@@ -1,19 +1,38 @@
-# SAM - Agentic AI Assistant
+# NOVA - Agentic AI Assistant
 
-**SAM** is a sophisticated, locally-running AI assistant that integrates Gemini and Groq APIs to provide intelligent task automation, voice recognition, code generation, and system monitoring.
+**NOVA** (formerly SAM) is a sophisticated, locally-running AI assistant that integrates Gemini and Groq APIs to provide autonomous task execution, voice recognition, code generation, and system monitoring. The name defaults to `NOVA` and can be overridden with the `NOVA_NAME` (or legacy `SAM_NAME`) environment variable.
 
 ## Features
 
-✅ **Multi-API Integration** - Gemini & Groq for redundancy and optimal performance  
+✅ **Autonomous Agent** - Plan → act → observe → reflect loop over a modular tool registry  
+✅ **Modular Tools** - File ops, project/website scaffolding, safe shell, web fetch + web search, system info  
+✅ **Desktop Automation** - Mouse, keyboard, screenshots, window focus, clipboard  
+✅ **Sandboxed Code Execution** - Run generated Python in an isolated subprocess  
+✅ **Semantic Long-Term Memory** - Vector recall of relevant facts across sessions  
+✅ **Multi-Brain Routing** - Pluggable LLM "brains" (Gemini, Groq, and more) with automatic failover  
+✅ **Glowing Desktop Indicator** - Smooth pulsing, always-on-top status light (top-center) that changes color by state (idle/active/listening/thinking/speaking)  
 ✅ **Voice Recognition & Response** - Real-time voice input/output  
-✅ **Desktop Indicator** - Glowing animated circle showing SAM is active  
 ✅ **Code Generation** - AI-powered coding assistance  
-✅ **Task Execution** - Execute commands and automate workflows  
+✅ **Task Execution** - Execute commands and automate workflows (with safety filters)  
 ✅ **System Monitoring** - Monitor system resources and activities  
 ✅ **Local Storage** - Encrypted conversation history  
 ✅ **Cross-Platform** - Windows, Mac, Linux, and Android support  
 ✅ **Adaptive Responses** - Context-aware, mood-based interactions  
-✅ **Self-Improvement** - Updates logic based on interactions  
+
+### Architecture (modular for future self-improvement)
+
+```
+backend/
+  agent/        # autonomous agent loop, tool registry, safety
+    tools/      # one module per capability (file, project, shell, web, gui, clipboard, code, system)
+  brains/       # pluggable LLM backends + failover router
+  apis/         # provider SDK handlers (Gemini, Groq)
+  core/         # engine, memory, semantic memory, voice, task executor
+  features/     # web dashboard, scheduler
+desktop/        # glowing status indicator, system monitor
+```
+
+Add a new capability by dropping a `register(registry)` module in `backend/agent/tools/`. Add a new LLM by subclassing `Brain` and calling `router.register(...)`.
 
 ## Installation
 
