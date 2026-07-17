@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from typing import List, Dict
@@ -57,8 +57,13 @@ class WebDashboard:
                 while True:
                     data = await websocket.receive_text()
                     await self.broadcast(f"Message: {data}")
-            except:
-                self.active_connections.remove(websocket)
+            except WebSocketDisconnect:
+                logger.info("WebSocket client disconnected")
+            except Exception as e:
+                logger.error(f"WebSocket error: {e}")
+            finally:
+                if websocket in self.active_connections:
+                    self.active_connections.remove(websocket)
         
         @self.app.post("/api/command")
         async def execute_command(command: str):
@@ -68,11 +73,17 @@ class WebDashboard:
     
     async def broadcast(self, message: str):
         """Broadcast message to all connected clients"""
+        dead_connections = []
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to send to WebSocket client, dropping it: {e}")
+                dead_connections.append(connection)
+
+        for connection in dead_connections:
+            if connection in self.active_connections:
+                self.active_connections.remove(connection)
     
     def _get_dashboard_html(self) -> str:
         """Get dashboard HTML"""
